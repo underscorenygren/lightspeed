@@ -1,0 +1,26 @@
+version: "3"
+
+services:
+
+  rabbit:
+    image: library/rabbitmq:latest
+    hostname: "lightspeed"
+    ports:
+      - "5672:5672"
+
+  server:
+    build: ./app
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./app/:/opt/app/
+    depends_on:
+      - rabbit
+
+  listener:
+    build: ./app
+    command: "listener.py test"
+    volumes:
+      - ./app/:/opt/app/
+    depends_on:
+      - rabbit
