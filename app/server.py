@@ -1,10 +1,13 @@
-import logging
-import json
 import datetime
+import json
+import logging
+import signal
 
+import tornado.autoreload
 import tornado.ioloop
 import tornado.web
 import tornado.options
+import pika
 
 import rabbit
 
@@ -30,10 +33,12 @@ class Listener(object):
 
 		self.updated_at = now()
 		self.name = name
+		self.last_push = {}
 
 	def as_dict(self):
 		return {"updated_at": self.updated_at,
-				"name": self.name}
+				"name": self.name,
+				"last_push": self.last_push}
 
 
 class Listeners(object):
@@ -43,7 +48,7 @@ class Listeners(object):
 
 	def add(self, name, listener):
 		self.listeners[name] = listener
-		self.channel.queue_declare(name)
+		self._with_reconnect(lambda: self.channel.queue_declare(name))
 		self.notify(name, "created")
 		return listener
 
@@ -53,15 +58,33 @@ class Listeners(object):
 	def get_all(self):
 		return dict([(key, listener.as_dict()) for (key, listener) in self.listeners.items()])
 
-	def notify(self, name, action):
-		body = json.dumps({"action": action})
+	def notify(self, name, action, **kwargs):
+		body = json.dumps(dict(action=action, **kwargs))
 		logger.debug("notifying {} with {}: {}".format(name, action, body))
-		self.channel.basic_publish(exchange='', routing_key=name, body=body)
+		self._with_reconnect(
+				lambda: self.channel.basic_publish(exchange='', routing_key=name, body=body))
+
+	def _with_reconnect(self, fn):
+		try:
+			fn()
+		except (pika.exceptions.ConnectionClosed, pika.exceptions.ChannelClosed):
+			logger.debug("reconnecting rabbit")
+			self.channel = rabbit.connect()
+			fn()
 
 	def notify_all(self, action):
-		logger.debug("notifying all")
+		logger.debug("notifying all of {}".format(action))
 		for name, _ in self.listeners.items():
 			self.notify(name, action)
+
+	def match_repo(self, repo_name):
+		just_repo = repo_name.split('/')[-1]
+		to_return = []
+
+		for name, listener in self.listeners.items():
+			if name.find(just_repo) != -1:
+				to_return.append(listener)
+		return to_return
 
 
 listeners = Listeners()
@@ -78,6 +101,7 @@ class ReceiveHook(tornado.web.RequestHandler):
 		pusher = data.get("pusher", {}).get("name", "unknown")
 		branch = data.get("ref", "missing").split('/')[-1]
 		latest_hash = data.get("after")
+		repo_name = data.get("repository", {}).get("full_name")
 		all_modified = set()
 		for commit in data.get("commits", []):
 			for modified in commit.get("modified", []):
@@ -85,9 +109,23 @@ class ReceiveHook(tornado.web.RequestHandler):
 
 		logger.info("{} pushed {}({}). Modified: {}".format(pusher, branch, latest_hash, all_modified))
 
-		listeners.notify_all("push")
+		#logger.debug(json.dumps(data, indent=2))
 
-		self.write({})
+		matched = listeners.match_repo(repo_name)
+		out = {}
+		if not matched:
+			msg = "no listener for {}".format(repo_name)
+			logger.debug(msg)
+			out = {"msg": msg}
+		else:
+			for listener in matched:
+				listener.last_push = data
+				name = listener.name
+				logger.debug("notifying {}".format(name))
+				listeners.notify(name, "push", pusher=pusher,
+						branch=branch, latest_hash=latest_hash,
+						all_modified=[m for m in all_modified])
+		self.write(out)
 
 
 def json_serializer(obj):
@@ -160,4 +198,13 @@ if __name__ == "__main__":
 	logger = configure_logger('tornado.application')
 	logger.debug("starting")
 	app.listen(8080)
+
+	def on_reload(*args, **kwargs):
+		listeners.notify_all("shutdown")
+
+	def sig_handler(sig, frame):
+		listeners.notify_all("shutdown")
+
+	signal.signal(signal.SIGTERM, sig_handler)
+	tornado.autoreload.add_reload_hook(on_reload)
 	tornado.ioloop.IOLoop.instance().start()

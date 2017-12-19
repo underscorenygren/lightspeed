@@ -1,0 +1,32 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbit
+  labels:
+    component: rabbit
+spec:
+  selector:
+    component: rabbit
+  ports:
+  - name: http
+    port: 5672
+    targetPort: 5672
+    protocol: TCP
+  type: "LoadBalancer"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lightspeed
+  labels:
+    component: lightspeed
+spec:
+  selector:
+    component: lightspeed
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  type: "LoadBalancer"

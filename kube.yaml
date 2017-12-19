@@ -1,0 +1,41 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: lightspeed
+  namespace: default
+  labels:
+    component: lightspeed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: lightspeed
+  template:
+    metadata:
+      labels:
+        component: lightspeed
+    spec:
+      containers:
+      - name: server
+        image: 589318761596.dkr.ecr.us-east-1.amazonaws.com/lightspeed_server:latest
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: rabbit
+  namespace: default
+  labels:
+    component: rabbit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: rabbit
+  template:
+    metadata:
+      labels:
+        component: rabbit
+    spec:
+      containers:
+      - name: rabbit
+        image: rabbitmq:latest
