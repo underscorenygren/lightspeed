@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: server
-        image: 589318761596.dkr.ecr.us-east-1.amazonaws.com/lightspeed-server:latest
+        image: "589318761596.dkr.ecr.us-east-1.amazonaws.com/lightspeed-server:lightspeed"
 ---
 apiVersion: extensions/v1beta1
 kind: Deployment
