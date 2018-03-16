@@ -14,6 +14,7 @@ def run_one(to_exec, cwd, env={}, logger=None):
 	if cwd:
 		args['cwd'] = cwd
 	args['env'] = _env
+	args['stderr'] = subprocess.STDOUT
 	try:
 		if logger:
 			logger.debug("running {} in {} with env {}".format(to_exec,
