@@ -54,6 +54,6 @@ it.
 
 #### Running
 
-`RABBIT_HOST=rabbit python app/admin.py`
-`python app/listener.py --host rabbit my-config-file.json`
-`python app/hooks.py`
+- `RABBIT_HOST=rabbit python app/admin.py`
+- `python app/listener.py --host rabbit my-config-file.json`
+- `python app/hooks.py`
