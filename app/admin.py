@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import signal
+import re
 
 import tornado.autoreload
 import tornado.ioloop
@@ -11,12 +12,14 @@ import pika
 
 import rabbit
 
+from shared import ADMIN_PORT, \
+		configure_logger, \
+		env, \
+		json_serializer, \
+		Hello
 
-def configure_logger(name):
-	logger = logging.getLogger(name)
-	logger.addHandler(logging.StreamHandler())
-	logger.setLevel(logging.DEBUG)
-	return logger
+
+logger = logging.getLogger()
 
 
 def now():
@@ -82,63 +85,19 @@ class Listeners(object):
 		to_return = []
 
 		for name, listener in self.listeners.items():
-			if name.find(just_repo) != -1:
-				to_return.append(listener)
+			for reg in ["{}$".format(just_repo), "^{}".format(just_repo)]:
+				if re.search(reg, name):
+					to_return.append(listener)
 		return to_return
 
 
 listeners = Listeners()
 
 
-class ReceiveHook(tornado.web.RequestHandler):
-
-	def post(self):
-
-		logger = logging.getLogger('tornado.application')
-		data = tornado.escape.json_decode(self.request.body)
-		#pretty = json.dumps(data, indent=2)
-
-		pusher = data.get("pusher", {}).get("name", "unknown")
-		branch = data.get("ref", "missing").split('/')[-1]
-		latest_hash = data.get("after")
-		repo_name = data.get("repository", {}).get("full_name")
-		all_modified = set()
-		for commit in data.get("commits", []):
-			for modified in commit.get("modified", []):
-				all_modified.add(modified)
-
-		logger.info("{} pushed {}({}). Modified: {}".format(pusher, branch, latest_hash, all_modified))
-
-		#logger.debug(json.dumps(data, indent=2))
-
-		matched = listeners.match_repo(repo_name)
-		out = {}
-		if not matched:
-			msg = "no listener for {}".format(repo_name)
-			logger.debug(msg)
-			out = {"msg": msg}
-		else:
-			for listener in matched:
-				listener.last_push = data
-				name = listener.name
-				logger.debug("notifying {}".format(name))
-				listeners.notify(name, "push", pusher=pusher,
-						branch=branch, latest_hash=latest_hash,
-						all_modified=[m for m in all_modified])
-		self.write(out)
-
-
-def json_serializer(obj):
-
-	if isinstance(obj, datetime.datetime):
-		return obj.isoformat()
-
-	raise TypeError("coudldn't serialize {}".format(type(obj)))
-
-
 class ListenerHandler(tornado.web.RequestHandler):
 
 	def _write(self, obj):
+		self.set_header("Content-type", "application/json")
 		self.write(json.dumps(obj, default=json_serializer))
 
 	def error(self, msg):
@@ -176,20 +135,42 @@ class ListenerHandler(tornado.web.RequestHandler):
 			self.error("no such name {}".format(name))
 
 
-class Hello(tornado.web.RequestHandler):
+class MatchHandler(tornado.web.RequestHandler):
 
-	def get(self):
+	def post(self):
 
-		self.write({"hello": "world"})
+		body = self.request.body
+		data = json.loads(body)
+		repo_name = data['repo_name']
+		pusher = data['pusher']
+		branch = data['branch']
+		latest_hash = data['latest_hash']
+		all_modified = data['all_modified']
+
+		matched = listeners.match_repo(repo_name)
+		out = {}
+		if not matched:
+			msg = "no listener for {}".format(repo_name)
+			logger.debug(msg)
+			out = {"msg": msg}
+		else:
+			for listener in matched:
+				listener.last_push = data
+				name = listener.name
+				logger.debug("notifying {}".format(name))
+				listeners.notify(name, "push", pusher=pusher,
+						branch=branch, latest_hash=latest_hash,
+						all_modified=all_modified)
+		self.write(out)
 
 
 if __name__ == "__main__":
 
 	app = tornado.web.Application(
 			[
-				(r'/receive_hook', ReceiveHook),
-				(r'/listeners', ListenerHandler),
-				(r'/', Hello),
+				(r'/listeners/?', ListenerHandler),
+				(r'/match/?', MatchHandler),
+				(r'/', Hello, {"message": "ui"}),
 			],
 			debug=True
 		)
@@ -197,7 +178,8 @@ if __name__ == "__main__":
 	tornado.options.parse_command_line()
 	logger = configure_logger('tornado.application')
 	logger.debug("starting")
-	app.listen(8080)
+	admin_port = env("ADMIN_PORT", ADMIN_PORT)
+	app.listen(admin_port, address='0.0.0.0')
 
 	def on_reload(*args, **kwargs):
 		listeners.notify_all("shutdown")

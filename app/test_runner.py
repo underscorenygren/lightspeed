@@ -1,12 +1,23 @@
+import os
 import subprocess
 
-def run_one(to_exec, cwd):
+def run_one(to_exec, cwd, env={}, logger=None):
 	args = {'shell': True}
 	output = ''
 	worked = False
+	_env = os.environ.copy()
+	if not to_exec:
+		return False, "no to_exec passed"
+
+	for key, val in env.items():
+		_env[key] = val
 	if cwd:
 		args['cwd'] = cwd
+	args['env'] = _env
 	try:
+		if logger:
+			logger.debug("running {} in {} with env {}".format(to_exec,
+				cwd, _env))
 		output = subprocess.check_output(to_exec, **args)
 		worked = True
 	except subprocess.CalledProcessError as cpe:
@@ -19,19 +30,19 @@ def run_one(to_exec, cwd):
 	return worked, output
 
 
-def run(one_or_many, cwd):
+def run(one_or_many, cwd, env={}, logger=None):
 
 	if isinstance(one_or_many, list):
 		all_output = ""
 		for to_exec in one_or_many:
-			_worked, _output = run_one(to_exec, cwd)
+			_worked, _output = run_one(to_exec, cwd, env=env, logger=logger)
 			if not _worked:
 				return _worked, _output
 			else:
 				all_output += "\n{}".format(_output)
 		return True, all_output
 	else:
-		return run_one(one_or_many)
+		return run_one(one_or_many, cwd, env=env, logger=logger)
 
 
 if __name__ == "__main__":

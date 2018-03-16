@@ -34,6 +34,9 @@ def consume(args):
 		logger.error("No name set in config!")
 
 	_exec = config['exec']
+	cwd = config.get('cwd')
+	if cwd:
+		_dir = cwd
 
 	def connect():
 		disconnected = True
@@ -55,6 +58,7 @@ def consume(args):
 		try:
 			parsed = json.loads(body)
 			action = parsed.get("action")
+			updated_branch = parsed.get("branch", 'master')
 			if action == "push":
 				branch_filter = _config.get('branch_filter')
 				branch = parsed.get("branch")
@@ -89,12 +93,16 @@ def consume(args):
 					logger.debug("skipping b/c of filter")
 
 				else:
-					worked, output = run(_exec, _dir)
+					worked, output = run(_exec, _dir, env={'branch': updated_branch}, logger=logger)
 					hook = _config.get("discord_hook")
 					msg = "[{}] {}".format(name, "test passed!" if worked else "FAILURE!\n{}".format(output))
 					logger.info(msg)
 					deploy = _config.get("deploy")
 					fail_msg = "FAILED"
+					if output:
+						logger.info(output)
+					if not worked:
+						logger.info("[no output]")
 					if deploy:
 						if worked:
 							worked, output = run(deploy, _dir)
@@ -127,6 +135,8 @@ def consume(args):
 				connect()
 				logger.info("reconnected")
 
+			elif action == "created":
+				logger.info("successfully connected")
 			else:
 				logger.info("not recognized action: {}".format(action))
 		except:
