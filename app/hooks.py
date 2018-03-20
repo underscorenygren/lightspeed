@@ -27,6 +27,10 @@ class ReceiveHook(tornado.web.RequestHandler):
 		for commit in data.get("commits", []):
 			for modified in commit.get("modified", []):
 				all_modified.add(modified)
+		deleted = data.get("deleted")
+		if deleted:
+			if not env("TRIGGER_ON_DELETE"):
+				return self.write({"msg": "skipping delete action"})
 
 		logger.info("{} pushed {}({}). Modified: {}".format(pusher, branch, latest_hash, all_modified))
 
