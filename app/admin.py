@@ -37,11 +37,13 @@ class Listener(object):
 		self.updated_at = now()
 		self.name = name
 		self.last_push = {}
+		self.notify = {}
 
 	def as_dict(self):
 		return {"updated_at": self.updated_at,
 				"name": self.name,
-				"last_push": self.last_push}
+				"last_push": self.last_push,
+				"notify": self.notify}
 
 
 class Listeners(object):
@@ -57,6 +59,9 @@ class Listeners(object):
 
 	def delete(self, name):
 		del self.listeners[name]
+
+	def get(self, name):
+		return self.listeners.get(name)
 
 	def get_all(self):
 		return dict([(key, listener.as_dict()) for (key, listener) in self.listeners.items()])
@@ -120,6 +125,19 @@ class ListenerHandler(tornado.web.RequestHandler):
 		logger.debug('added listener {}'.format(name))
 
 		self._write(listener.as_dict())
+
+	def put(self):
+		data = tornado.escape.json_decode(self.request.body)
+		name = data.get('name')
+		if not name:
+			return self.error("no name supplied")
+		listener = listeners.get(name)
+		if not listener:
+			return self.error("no listener with that name")
+
+		del data['name']
+		logger.debug("updating listener({}) data".format(name))
+		listener.notify = dict(data)
 
 	def delete(self):
 

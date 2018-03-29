@@ -51,6 +51,16 @@ def consume(args):
 			except requests.ConnectionError:
 				logger.debug("couldn't connect")
 
+	def notify(notify_data):
+		url = "http://{}:{}/listeners".format(host, port)
+		logger.debug("notifying {} on {}".format(name, url))
+		try:
+			resp = requests.put(url, json=dict(notify_data, name=name))
+			if resp.status_code != 200:
+				logger.error("error on notify: {}".format(resp.text))
+		except requests.ConnectionError:
+			logger.error("couldn't notify")
+
 	def recv(ch, method, properties, body):
 		logger.debug("calling receive on {}".format(body))
 		#reloading config
@@ -93,7 +103,18 @@ def consume(args):
 					logger.debug("skipping b/c of filter")
 
 				else:
+					notify_data = {"msg": "running hook",
+						"branch": updated_branch}
+					for attr in ['pusher', 'latest_hash']:
+						notify_data[attr] = parsed.get(attr)
+					notify(notify_data)
 					worked, output = run(_exec, _dir, env={'branch': updated_branch}, logger=logger)
+
+					notify_data['msg'] = "completed" if worked else "FAILED"
+					if not worked:
+						notify_data['output'] = output.split('\n')
+					notify(notify_data)
+
 					hook = _config.get("discord_hook")
 					msg = "[{}] {}".format(name, "test passed!" if worked else "FAILURE!\n{}".format(output))
 					logger.info(msg)
