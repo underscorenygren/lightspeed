@@ -97,18 +97,11 @@ def consume(args):
 					hook = _config.get("discord_hook")
 					msg = "[{}] {}".format(name, "test passed!" if worked else "FAILURE!\n{}".format(output))
 					logger.info(msg)
-					deploy = _config.get("deploy")
 					fail_msg = "FAILED"
 					if output:
 						logger.info(output)
 					if not worked:
 						logger.info("[no output]")
-					if deploy:
-						if worked:
-							worked, output = run(deploy, _dir)
-							fail_msg = "DEPLOY ERROR"
-							if worked:
-								msg = "tests passed, deployed ```{}```".format(deploy)
 
 					if hook:
 						hook_error = None

@@ -26,8 +26,7 @@ Configuration is done via json:
 {
   "name": "my-repo-with-name", //name substring matches repositories
   "exec": ["python tester.py"], //the commands to run on match
-  "deploy": ["deploy-script.sh"], //optional field that will run a script when `exec` returns with a 0 exit code
-  "cwd": "/some/path", //will run execs and deploys in this directory
+  "cwd": "/some/path", //will run execs in this directory
   "discord_hook": "https://discordapp.com/api/webhooks/someid/more-id", //discord support is experimental
   "discord_notify": "@here"
 }
