@@ -127,9 +127,12 @@ def consume(args):
 						hook_error = None
 						try:
 							discord_user = _config.get("discord_notify", '@here')
-							discord_msg = "{} {}".format(discord_user, msg)
+							discord_msg = "{} {}".format(discord_user, msg)\
+									.replace(name, '`{}`'.format(name))\
+									.replace('FAILED', '**FAILED**')
+
 							if not worked:
-								discord_msg += "\n```{}```".format(output[:1900]) if output else "[no output]"
+								discord_msg += "\n```{}```".format(output[:1800]) if output else "[no output]"
 							resp = requests.post(hook, json={"content": discord_msg})
 							if resp.status_code != 200:
 								hook_error = resp.text
