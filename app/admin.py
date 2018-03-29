@@ -64,7 +64,7 @@ class Listeners(object):
 		listener = None
 		if name:
 			listener = self.listeners.get(name)
-		return {} if not listener else listener.as_dict()
+		return listener
 
 	def get_all(self):
 		return dict([(key, listener.as_dict()) for (key, listener) in self.listeners.items()])
@@ -120,7 +120,8 @@ class BaseHandler(tornado.web.RequestHandler):
 
 class ListenerHandler(BaseHandler):
 	def get(self, name=None):
-		self._write(listeners.get(name))
+		listener = listeners.get(name)
+		self._write(listener.as_dict() if listener else None)
 
 
 class ListenersHandler(BaseHandler):
