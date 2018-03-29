@@ -61,7 +61,10 @@ class Listeners(object):
 		del self.listeners[name]
 
 	def get(self, name):
-		return self.listeners.get(name)
+		listener = None
+		if name:
+			listener = self.listeners.get(name)
+		return {} if not listener else listener.as_dict()
 
 	def get_all(self):
 		return dict([(key, listener.as_dict()) for (key, listener) in self.listeners.items()])
@@ -99,17 +102,28 @@ class Listeners(object):
 listeners = Listeners()
 
 
-class ListenerHandler(tornado.web.RequestHandler):
+class BaseHandler(tornado.web.RequestHandler):
 
 	def _write(self, obj):
 		self.set_header("Content-type", "application/json")
-		self.write(json.dumps(obj, default=json_serializer))
+		if obj is None:
+			self.set_status(404)
+			self.write('{}')
+		else:
+			self.write(json.dumps(obj, default=json_serializer))
 
 	def error(self, msg):
 
 		self.set_status(400)
 		return self.write({"error": msg})
 
+
+class ListenerHandler(BaseHandler):
+	def get(self, name=None):
+		self._write(listeners.get(name))
+
+
+class ListenersHandler(BaseHandler):
 	def get(self):
 
 		self._write(listeners.get_all())
@@ -186,7 +200,8 @@ if __name__ == "__main__":
 
 	app = tornado.web.Application(
 			[
-				(r'/listeners/?', ListenerHandler),
+				(r'/listeners/(?P<name>[-_\w\d]+)/?', ListenerHandler),
+				(r'/listeners/?', ListenersHandler),
 				(r'/match/?', MatchHandler),
 				(r'/', Hello, {"message": "ui"}),
 			],
