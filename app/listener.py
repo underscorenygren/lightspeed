@@ -110,15 +110,14 @@ def consume(args):
 					notify(notify_data)
 					worked, output = run(_exec, _dir, env={'branch': updated_branch}, logger=logger)
 
-					notify_data['msg'] = "completed" if worked else "FAILED"
+					msg = "CI job {} {} on branch({})".format(name, "succeeded" if worked else "FAILED", updated_branch)
+					notify_data['msg'] = msg
 					if not worked:
 						notify_data['output'] = output.split('\n')
 					notify(notify_data)
 
 					hook = _config.get("discord_hook")
-					msg = "[{}] {}".format(name, "test passed!" if worked else "FAILURE!\n{}".format(output))
 					logger.info(msg)
-					fail_msg = "FAILED"
 					if output:
 						logger.info(output)
 					if not worked:
@@ -127,10 +126,10 @@ def consume(args):
 					if hook:
 						hook_error = None
 						try:
-							discord_msg = msg
+							discord_user = _config.get("discord_notify", '@here')
+							discord_msg = "{} {}".format(discord_user, msg)
 							if not worked:
-								out = "```{}```".format(output[:1900]) if output else "[no output]"
-								discord_msg = "[{}] {} {} {}".format(name, fail_msg, _config.get("discord_notify"), out)
+								discord_msg += "\n```{}```".format(output[:1900]) if output else "[no output]"
 							resp = requests.post(hook, json={"content": discord_msg})
 							if resp.status_code != 200:
 								hook_error = resp.text
