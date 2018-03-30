@@ -126,7 +126,7 @@ def consume(args):
 					if hook:
 						hook_error = None
 						try:
-							discord_user = _config.get("discord_notify", '@here')
+							discord_user = _config.get("discord_notify", '')
 							discord_msg = "{} {}".format(discord_user, msg)\
 									.replace(name, '`{}`'.format(name))\
 									.replace('FAILED', '**FAILED**')
