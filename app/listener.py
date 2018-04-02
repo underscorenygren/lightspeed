@@ -61,6 +61,27 @@ def consume(args):
 		except requests.ConnectionError:
 			logger.error("couldn't notify")
 
+	def discord_notify(_config, msg):
+		hook = _config.get("discord_hook")
+		if hook:
+			hook_error = None
+			try:
+				discord_user = _config.get("discord_notify", '')
+				discord_msg = "{} {}".format(discord_user, msg)\
+						.replace(name, '`{}`'.format(name))\
+						.replace('FAILED', '**FAILED**')
+
+				resp = requests.post(hook, json={"content": discord_msg})
+				if resp.status_code != 200:
+					hook_error = resp.text
+			except requests.RequestException as re:
+				hook_error = str(re)
+				logger.exception("hook failed")
+			if hook_error:
+				logger.error("Hook failed to execute: {}".format(hook_error))
+			else:
+				logger.debug("hook ok")
+
 	def recv(ch, method, properties, body):
 		logger.debug("calling receive on {}".format(body))
 		#reloading config
@@ -108,6 +129,7 @@ def consume(args):
 					for attr in ['pusher', 'latest_hash']:
 						notify_data[attr] = parsed.get(attr)
 					notify(notify_data)
+					discord_notify(_config, "{pusher} {msg} {name} on {branch}".format(**dict(notify_data, name=name)))
 					worked, output = run(_exec, _dir, env={'branch': updated_branch}, logger=logger)
 
 					msg = "CI job {} {} on branch({})".format(name, "succeeded" if worked else "FAILED", updated_branch)
@@ -116,35 +138,16 @@ def consume(args):
 						notify_data['output'] = output.split('\n')
 					notify(notify_data)
 
-					hook = _config.get("discord_hook")
 					logger.info(msg)
 					if output:
 						logger.info(output)
 					if not worked:
 						logger.info("[no output]")
 
-					if hook:
-						hook_error = None
-						try:
-							discord_user = _config.get("discord_notify", '')
-							discord_msg = "{} {}".format(discord_user, msg)\
-									.replace(name, '`{}`'.format(name))\
-									.replace('FAILED', '**FAILED**')
-
-							if not worked:
-								discord_msg += "\n```{}```".format(output[:1800]) if output else "[no output]"
-							resp = requests.post(hook, json={"content": discord_msg})
-							if resp.status_code != 200:
-								hook_error = resp.text
-						except requests.RequestException as re:
-							hook_error = str(re)
-							logger.exception("hook failed")
-						if hook_error:
-							logger.error("Hook failed to execute: {}".format(hook_error))
-						else:
-							logger.debug("hook ok")
-					else:
-						logger.debug("no hook registered")
+					discord_msg = msg
+					if not worked:
+						discord_msg += "\n```{}```".format(output[:1800]) if output else "`[no output]`"
+					discord_notify(_config, discord_msg)
 
 			elif action == "shutdown":
 				logger.info("received shutdown signal, reconnecting")
