@@ -4,6 +4,7 @@ import json
 import os
 import requests
 import time
+import portalocker
 
 import rabbit
 from test_runner import run
@@ -82,6 +83,32 @@ def consume(args):
 			else:
 				logger.debug("hook ok")
 
+	def run_hook(_config, parsed, updated_branch):
+		notify_data = {"msg": "running hook",
+			"branch": updated_branch}
+		for attr in ['pusher', 'latest_hash']:
+			notify_data[attr] = parsed.get(attr)
+		notify(notify_data)
+		discord_notify(_config, "{pusher} {msg} {name} on {branch}".format(**dict(notify_data, name=name)))
+		worked, output = run(_exec, _dir, env={'branch': updated_branch}, logger=logger)
+
+		msg = "CI job {} {} on branch({})".format(name, "succeeded" if worked else "FAILED", updated_branch)
+		notify_data['msg'] = msg
+		if not worked:
+			notify_data['output'] = output.split('\n')
+		notify(notify_data)
+
+		logger.info(msg)
+		if output:
+			logger.info(output)
+		if not worked:
+			logger.info("[no output]")
+
+		discord_msg = msg
+		if not worked:
+			discord_msg += "\n```{}```".format(output[:1800]) if output else "`[no output]`"
+		discord_notify(_config, discord_msg)
+
 	def recv(ch, method, properties, body):
 		logger.debug("calling receive on {}".format(body))
 		#reloading config
@@ -124,30 +151,17 @@ def consume(args):
 					logger.debug("skipping b/c of filter")
 
 				else:
-					notify_data = {"msg": "running hook",
-						"branch": updated_branch}
-					for attr in ['pusher', 'latest_hash']:
-						notify_data[attr] = parsed.get(attr)
-					notify(notify_data)
-					discord_notify(_config, "{pusher} {msg} {name} on {branch}".format(**dict(notify_data, name=name)))
-					worked, output = run(_exec, _dir, env={'branch': updated_branch}, logger=logger)
-
-					msg = "CI job {} {} on branch({})".format(name, "succeeded" if worked else "FAILED", updated_branch)
-					notify_data['msg'] = msg
-					if not worked:
-						notify_data['output'] = output.split('\n')
-					notify(notify_data)
-
-					logger.info(msg)
-					if output:
-						logger.info(output)
-					if not worked:
-						logger.info("[no output]")
-
-					discord_msg = msg
-					if not worked:
-						discord_msg += "\n```{}```".format(output[:1800]) if output else "`[no output]`"
-					discord_notify(_config, discord_msg)
+					lock_file = _config.get('lock_file')
+					if lock_file:
+						logger.info("acquiring lock {}".format(lock_file))
+						timeout = 3 * 60
+						try:
+							with portalocker.Lock(lock_file, timeout=timeout):
+								run_hook(_config, parsed, updated_branch)
+						except portalocker.exceptions.LockException:
+							logger.error("lock acquisition timeout on {} after {}".format(lock_file, timeout))
+					else:
+						run_hook(_config, parsed, updated_branch)
 
 			elif action == "shutdown":
 				logger.info("received shutdown signal, reconnecting")
