@@ -29,6 +29,10 @@ def now():
 def is_updated_since(d1, seconds_old):
 	return now() - d1 < datetime.timedelta(seconds=seconds_old)
 
+def filter_push_data(data):
+	KEYS = ['pusher', 'branch', 'latest_hash', 'all_modified']
+	return {key: value for (key, value) in data.items() if key in KEYS}
+
 
 class Listener(object):
 
@@ -160,8 +164,19 @@ class ListenersHandler(BaseHandler):
 			listeners.notify(name, 'update', data=update_data)
 			msg = "updated {}".format(name)
 		elif update_data.get('retrigger'):
+			listener = listeners.get(name)
+			if not listener:
+				return self.error("no listener registed")
+			if not listener.last_push:
+				return self.error("no push received by this listener")
+
 			msg = "retriggering {}".format(name)
+			logger.info(msg)
+			listeners.notify(name, "push", **filter_push_data(listener.last_push))
+
 			listeners.notify(name, 'retrigger')
+		else:
+			return self.error(msg)
 
 		self._write({"msg": msg})
 
@@ -186,10 +201,6 @@ class MatchHandler(tornado.web.RequestHandler):
 		body = self.request.body
 		data = json.loads(body)
 		repo_name = data['repo_name']
-		pusher = data['pusher']
-		branch = data['branch']
-		latest_hash = data['latest_hash']
-		all_modified = data['all_modified']
 
 		matched = listeners.match_repo(repo_name)
 		out = {}
@@ -202,9 +213,7 @@ class MatchHandler(tornado.web.RequestHandler):
 				listener.last_push = data
 				name = listener.name
 				logger.debug("notifying {}".format(name))
-				listeners.notify(name, "push", pusher=pusher,
-						branch=branch, latest_hash=latest_hash,
-						all_modified=all_modified)
+				listeners.notify(name, "push", **filter_push_data(data))
 		self.write(out)
 
 

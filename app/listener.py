@@ -171,20 +171,16 @@ def consume(args):
 			else:
 				run_hook(_config, parsed, updated_branch)
 
-	last_parsed = None
-
 	def recv(ch, method, properties, body):
 		logger.debug("calling receive on {}".format(body))
 		#reloading config
 		_config, _ = parse_config(args)
-		global last_parsed  # this is ugly as hell, but I'm lazy
 		try:
 			parsed = json.loads(body)
 			action = parsed.get("action")
 			updated_branch = parsed.get("branch", 'master')
 			if action == "push":
 				handle_push(_config, parsed, updated_branch)
-				last_parsed = parsed
 
 			elif action == "shutdown":
 				logger.info("received shutdown signal, reconnecting")
@@ -193,12 +189,6 @@ def consume(args):
 
 			elif action == 'update':
 				update_config(parsed.get('data', {}))
-
-			elif action == 'retrigger':
-				if not last_parsed:
-					logger.info("no stored fetch found to retrigger")
-				else:
-					handle_push(_config, last_parsed, last_parsed.get('branch', updated_branch))
 
 			elif action == "created":
 				logger.info("successfully connected")
