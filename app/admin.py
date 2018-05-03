@@ -32,18 +32,20 @@ def is_updated_since(d1, seconds_old):
 
 class Listener(object):
 
-	def __init__(self, name):
+	def __init__(self, name, config={}):
 
 		self.updated_at = now()
 		self.name = name
 		self.last_push = {}
 		self.notify = {}
+		self.config = config
 
 	def as_dict(self):
 		return {"updated_at": self.updated_at,
 				"name": self.name,
 				"last_push": self.last_push,
-				"notify": self.notify}
+				"notify": self.notify,
+				"config": self.config}
 
 
 class Listeners(object):
@@ -136,7 +138,7 @@ class ListenersHandler(BaseHandler):
 		if not name:
 			return self.error("no name supplied")
 
-		listener = listeners.add(name, Listener(name))
+		listener = listeners.add(name, Listener(name, config=data.get('config')))
 		logger.debug('added listener {}'.format(name))
 
 		self._write(listener.as_dict())
@@ -151,8 +153,17 @@ class ListenersHandler(BaseHandler):
 			return self.error("no listener with that name")
 
 		del data['name']
-		logger.debug("updating listener({}) data".format(name))
-		listeners.notify(name, 'update', data=data)
+		update_data = data.get('data')
+		msg = "no action mapped"
+		if update_data:
+			logger.debug("updating listener({}) data".format(name))
+			listeners.notify(name, 'update', data=update_data)
+			msg = "updated {}".format(name)
+		elif update_data.get('retrigger'):
+			msg = "retriggering {}".format(name)
+			listeners.notify(name, 'retrigger')
+
+		self._write({"msg": msg})
 
 	def delete(self):
 

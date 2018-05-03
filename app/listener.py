@@ -47,7 +47,7 @@ def consume(args):
 			logger.debug("sleeping")
 			time.sleep(1)
 			try:
-				resp = requests.post(url, json={"name": name})
+				resp = requests.post(url, json={"name": name, "config": config})
 				disconnected = resp.status_code != 200
 			except requests.ConnectionError:
 				logger.debug("couldn't connect")
@@ -125,59 +125,66 @@ def consume(args):
 			discord_msg += "\n```{}```".format(output[:1800]) if output else "`[no output]`"
 		discord_notify(_config, discord_msg)
 
+	def handle_push(_config, parsed, updated_branch):
+		branch_filter = _config.get('branch_filter')
+		branch = parsed.get("branch")
+		filtered = False
+		if branch_filter:
+			if not isinstance(branch_filter, list):
+				logger.error("branch filter isn't a list")
+				filtered = True
+			elif branch not in branch_filter:
+				logger.info("skipping, branch '{}' not in {}".format(branch, branch_filter))
+				filtered = True
+
+		files_filter = _config.get("files_filter")
+		if not filtered and files_filter:
+			if not isinstance(files_filter, list):
+				filtered = True
+				logger.error("files filter must be a list")
+			else:
+				all_modified = parsed.get("all_modified")
+				filtered = True
+				for modified in all_modified:
+					for file_filter in files_filter:
+						if modified.find(file_filter) != -1:
+							logger.debug("found filter match {} with {}".format(file_filter, modified))
+							filtered = False
+							break
+				if filtered:
+					logger.debug("modified {} not in {}".format(all_modified, files_filter))
+					logger.info("no match in file filters")
+
+		if filtered:
+			logger.debug("skipping b/c of filter")
+
+		else:
+			lock_file = _config.get('lock_file')
+			if lock_file:
+				logger.info("acquiring lock {}".format(lock_file))
+				timeout = 3 * 60
+				try:
+					with portalocker.Lock(lock_file, timeout=timeout):
+						run_hook(_config, parsed, updated_branch)
+				except portalocker.exceptions.LockException:
+					logger.error("lock acquisition timeout on {} after {}".format(lock_file, timeout))
+			else:
+				run_hook(_config, parsed, updated_branch)
+
+	last_parsed = None
+
 	def recv(ch, method, properties, body):
 		logger.debug("calling receive on {}".format(body))
 		#reloading config
 		_config, _ = parse_config(args)
+		global last_parsed  # this is ugly as hell, but I'm lazy
 		try:
 			parsed = json.loads(body)
 			action = parsed.get("action")
 			updated_branch = parsed.get("branch", 'master')
 			if action == "push":
-				branch_filter = _config.get('branch_filter')
-				branch = parsed.get("branch")
-				filtered = False
-				if branch_filter:
-					if not isinstance(branch_filter, list):
-						logger.error("branch filter isn't a list")
-						filtered = True
-					elif branch not in branch_filter:
-						logger.info("skipping, branch '{}' not in {}".format(branch, branch_filter))
-						filtered = True
-
-				files_filter = _config.get("files_filter")
-				if not filtered and files_filter:
-					if not isinstance(files_filter, list):
-						filtered = True
-						logger.error("files filter must be a list")
-					else:
-						all_modified = parsed.get("all_modified")
-						filtered = True
-						for modified in all_modified:
-							for file_filter in files_filter:
-								if modified.find(file_filter) != -1:
-									logger.debug("found filter match {} with {}".format(file_filter, modified))
-									filtered = False
-									break
-						if filtered:
-							logger.debug("modified {} not in {}".format(all_modified, files_filter))
-							logger.info("no match in file filters")
-
-				if filtered:
-					logger.debug("skipping b/c of filter")
-
-				else:
-					lock_file = _config.get('lock_file')
-					if lock_file:
-						logger.info("acquiring lock {}".format(lock_file))
-						timeout = 3 * 60
-						try:
-							with portalocker.Lock(lock_file, timeout=timeout):
-								run_hook(_config, parsed, updated_branch)
-						except portalocker.exceptions.LockException:
-							logger.error("lock acquisition timeout on {} after {}".format(lock_file, timeout))
-					else:
-						run_hook(_config, parsed, updated_branch)
+				handle_push(_config, parsed, updated_branch)
+				last_parsed = parsed
 
 			elif action == "shutdown":
 				logger.info("received shutdown signal, reconnecting")
@@ -186,6 +193,12 @@ def consume(args):
 
 			elif action == 'update':
 				update_config(parsed.get('data', {}))
+
+			elif action == 'retrigger':
+				if not last_parsed:
+					logger.info("no stored fetch found to retrigger")
+				else:
+					handle_push(_config, last_parsed, last_parsed.get('branch', updated_branch))
 
 			elif action == "created":
 				logger.info("successfully connected")
