@@ -163,7 +163,7 @@ class ListenersHandler(BaseHandler):
 			logger.debug("updating listener({}) data".format(name))
 			listeners.notify(name, 'update', data=update_data)
 			msg = "updated {}".format(name)
-		elif update_data.get('retrigger'):
+		elif data.get('retrigger'):
 			listener = listeners.get(name)
 			if not listener:
 				return self.error("no listener registed")
