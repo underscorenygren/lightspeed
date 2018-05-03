@@ -28,6 +28,7 @@ def parse_config(args):
 def consume(args):
 	host = args.host
 	port = args.port
+	url = "http://{}:{}/listeners".format(host, port)
 
 	config, _dir = parse_config(args)
 	name = config.get('name')
@@ -41,7 +42,6 @@ def consume(args):
 
 	def connect():
 		disconnected = True
-		url = "http://{}:{}/listeners".format(host, port)
 		logger.info("connecting {} on {}".format(name, url))
 		while disconnected:
 			logger.debug("sleeping")
@@ -54,6 +54,7 @@ def consume(args):
 
 	def update_config(new_config):
 		_config, _dir = parse_config(args)
+		name = _config['name']
 		if _dir is None:
 			return
 		if not new_config:
@@ -67,6 +68,7 @@ def consume(args):
 		with open(os.path.join(_dir, args.config), 'w') as config_file:
 			logger.info("updating config {}".format(config_file))
 			config_file.write(json.dumps(_config, indent=2))
+			requests.put(url, json={"name": name, "config": _config})
 
 	def notify(notify_data):
 		url = "http://{}:{}/listeners".format(host, port)

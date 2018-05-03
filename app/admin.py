@@ -171,10 +171,18 @@ class ListenersHandler(BaseHandler):
 				return self.error("no push received by this listener")
 
 			msg = "retriggering {}".format(name)
-			logger.info(msg)
+			logger.debug(msg)
 			listeners.notify(name, "push", **filter_push_data(listener.last_push))
 
 			listeners.notify(name, 'retrigger')
+		elif data.get('config'):
+			msg = "updating config"
+			listener = listeners.get(name)
+			if not listener:
+				return self.error("no listener registed")
+			logger.debug(msg)
+			listener.config = data['config']
+
 		else:
 			return self.error(msg)
 
