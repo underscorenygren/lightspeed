@@ -152,7 +152,7 @@ class ListenersHandler(BaseHandler):
 
 		del data['name']
 		logger.debug("updating listener({}) data".format(name))
-		listener.notify = dict(data)
+		listeners.notify(name, 'update', data=data)
 
 	def delete(self):
 

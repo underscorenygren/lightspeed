@@ -52,6 +52,22 @@ def consume(args):
 			except requests.ConnectionError:
 				logger.debug("couldn't connect")
 
+	def update_config(new_config):
+		_config, _dir = parse_config(args)
+		if _dir is None:
+			return
+		if not new_config:
+			logger.info("skipping update of empty config")
+			return
+
+		if 'name' in new_config:
+			del new_config['name']
+		_config.merge(new_config)
+
+		with open(os.path.join(_dir, args.config), 'w') as config_file:
+			logger.info("updating config {}".format(config_file))
+			config_file.write(json.dumps(_config, indent=2))
+
 	def notify(notify_data):
 		url = "http://{}:{}/listeners".format(host, port)
 		logger.debug("notifying {} on {}".format(name, url))
@@ -167,6 +183,9 @@ def consume(args):
 				logger.info("received shutdown signal, reconnecting")
 				connect()
 				logger.info("reconnected")
+
+			elif action == 'update':
+				update_config(parsed.get('data', {}))
 
 			elif action == "created":
 				logger.info("successfully connected")
