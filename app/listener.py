@@ -62,7 +62,7 @@ def consume(args):
 
 		if 'name' in new_config:
 			del new_config['name']
-		_config.merge(new_config)
+		_config.update(new_config)
 
 		with open(os.path.join(_dir, args.config), 'w') as config_file:
 			logger.info("updating config {}".format(config_file))
