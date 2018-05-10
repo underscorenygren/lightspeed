@@ -1,0 +1,55 @@
+@import '/reset.css';
+
+:root {
+  font-size: 62.5%;
+}
+
+body {
+  font-size: 1.6rem;
+  font-family: system, sans-serif;
+}
+
+.header {
+  display: flex;
+  padding: 2.4rem;
+}
+
+.header-title {
+  font-size: 2.4rem;
+  font-style: italic;
+  font-weight: bold;
+  text-transform: lowercase;
+}
+
+.main {
+  padding: 0 2.4rem;
+}
+
+.listeners {
+  padding-bottom: 1.2rem;
+}
+
+.listener {
+  margin-bottom: 1.2rem;
+  padding: 1.2rem;
+  border-radius: 0.4rem;
+  background-color: #dddddd;
+}
+
+.listener-title {
+  font-weight: bold;
+  margin-bottom: 1.2rem;
+}
+
+.no-branches {
+  font-style: italic;
+  color: #999999;
+}
+
+[data-status="loading-listeners"] .listeners {
+  display: none;
+}
+
+[data-status="loading-repos"] .loading-listeners {
+  display: none;
+}
