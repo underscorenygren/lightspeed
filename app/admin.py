@@ -1,15 +1,16 @@
 import datetime
 import json
 import logging
-import signal
+import os
 import re
+import signal
 
 import tornado.autoreload
 import tornado.ioloop
-import tornado.web
 import tornado.options
-import pika
+import tornado.web
 
+import pika
 import rabbit
 
 from shared import ADMIN_PORT, \
@@ -248,6 +249,7 @@ if __name__ == "__main__":
 				(r'/listeners/(?P<name>[-_\w\d]+)/?', ListenerHandler),
 				(r'/listeners/?', ListenersHandler),
 				(r'/match/?', MatchHandler),
+				(r'/ui/([.a-zA-z0-9])', tornado.web.StaticFileHandler, {'path': os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ui')}),
 				(r'/', Hello, {"message": "ui"}),
 			],
 			debug=True
