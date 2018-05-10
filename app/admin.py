@@ -41,6 +41,7 @@ class Listener(object):
 		self.updated_at = now()
 		self.name = name
 		self.last_push = {}
+		self.last_pushes = {}
 		self.notify = {}
 		self.config = config
 
@@ -48,6 +49,7 @@ class Listener(object):
 		return {"updated_at": self.updated_at,
 				"name": self.name,
 				"last_push": self.last_push,
+				"last_pushes": self.last_pushes,
 				"notify": self.notify,
 				"config": self.config}
 
@@ -177,12 +179,14 @@ class ListenersHandler(BaseHandler):
 			listener = listeners.get(name)
 			if not listener:
 				return self.error("no listener registed")
-			if not listener.last_push:
+			if not listener.last_pushes:
 				return self.error("no push received by this listener")
 
 			msg = "retriggering {}".format(name)
 			logger.debug(msg)
-			listeners.notify(name, "push", **filter_push_data(listener.last_push))
+			for (key, push) in listener.last_pushes.items():
+				logger.debug("notifying {}".format(key))
+				listeners.notify(name, "push", **filter_push_data(push))
 
 			listeners.notify(name, 'retrigger')
 		elif data.get('config'):
@@ -227,7 +231,9 @@ class MatchHandler(tornado.web.RequestHandler):
 			logger.debug(msg)
 			out = {"msg": msg}
 		else:
+			branch = data['branch']
 			for listener in matched:
+				listener.last_pushes[branch] = data
 				listener.last_push = data
 				name = listener.name
 				logger.debug("notifying {}".format(name))
