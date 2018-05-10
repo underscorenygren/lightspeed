@@ -249,7 +249,7 @@ if __name__ == "__main__":
 				(r'/listeners/(?P<name>[-_\w\d]+)/?', ListenerHandler),
 				(r'/listeners/?', ListenersHandler),
 				(r'/match/?', MatchHandler),
-				(r'/ui/([.a-zA-z0-9]+)', tornado.web.StaticFileHandler, {'path': os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ui')}),
+				(r'/([a-zA-z0-9]+\[.a-z0-9]{3,5})', tornado.web.StaticFileHandler, {'path': os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ui')}),
 				(r'/', Hello, {"message": "ui"}),
 			],
 			debug=True
