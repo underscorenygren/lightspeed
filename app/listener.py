@@ -124,7 +124,7 @@ def consume(args):
 
 		discord_msg = msg
 		if not worked:
-			discord_msg += "\n```{}```".format(output[:1800]) if output else "`[no output]`"
+			discord_msg += "\n```{}```".format(output[-1800:]) if output else "`[no output]`"
 		discord_notify(_config, discord_msg)
 
 	def handle_push(_config, parsed, updated_branch):
