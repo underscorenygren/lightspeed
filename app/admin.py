@@ -66,7 +66,10 @@ class Listeners(object):
 		self.listeners = {}
 		self.channel = rabbit.connect()
 
-	def add(self, name, listener):
+	def add(self, name=None, listener=None):
+		if not listener:
+			raise ValueError("listener required")
+		name = name or listener.name
 		self.listeners[name] = listener
 		self._with_reconnect(lambda: self.channel.queue_declare(name))
 		self.notify(name, "created")
@@ -163,7 +166,7 @@ class ListenersHandler(BaseHandler):
 			logger.info("not updating existing listener {} on POST, use PUT".format(name))
 		else:
 			logger.debug('added listener {}'.format(name))
-			listener = listeners.add(name, Listener(name=name, config=data.get('config')))
+			listener = listeners.add(name=name, listener=Listener(name=name, config=data.get('config')))
 
 		self._write(listener.as_dict())
 
@@ -277,7 +280,7 @@ if __name__ == "__main__":
 				for listener_dict in json.loads(f.read()):
 					logger.info("loading {} from disk".format(listener_dict))
 					try:
-						listeners.add(Listener(**listener_dict))
+						listeners.add(listener=Listener(**listener_dict))
 					except ValueError:
 						logger.error("listener is malformed")
 
