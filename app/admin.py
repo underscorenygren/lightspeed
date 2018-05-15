@@ -38,9 +38,9 @@ def filter_push_data(data):
 
 class Listener(object):
 
-	def __init__(self, name=None, config={},
-			updated_at=None, last_push={}, last_pushes={},
-			notify={}):
+	def __init__(self, name=None, config=None,
+			updated_at=None, last_push=None, last_pushes=None,
+			notify=None):
 
 		if not name:
 			raise ValueError("Listener must have name")
@@ -48,9 +48,9 @@ class Listener(object):
 		self.updated_at = updated_at or now()
 		self.name = name
 		self.last_push = last_push
-		self.last_pushes = last_pushes
-		self.notify = notify
-		self.config = config
+		self.last_pushes = last_pushes or {}
+		self.notify = notify or {}
+		self.config = config or {}
 
 	def as_dict(self):
 		return {"updated_at": self.updated_at,
