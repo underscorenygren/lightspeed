@@ -160,11 +160,10 @@ class ListenersHandler(BaseHandler):
 
 		listener = listeners.get(name)
 		if listener:
-			listener.config = data.get('config')
+			logger.info("not updating existing listener {} on POST, use PUT".format(name))
 		else:
+			logger.debug('added listener {}'.format(name))
 			listener = listeners.add(name, Listener(name=name, config=data.get('config')))
-
-		logger.debug('added listener {}'.format(name))
 
 		self._write(listener.as_dict())
 
@@ -269,7 +268,7 @@ if __name__ == "__main__":
 	def store_listeners():
 		logger.info("catching signal, storing listeners on disk at {}".format(data_store))
 		with open(data_store, 'w') as f:
-			f.write(json.dumps([listener_dict for listener_dict in listeners.get_all().values()], indent=2))
+			f.write(json.dumps([listener_dict for listener_dict in listeners.get_all().values()], indent=2, default=lambda _date: _date.isoformat()))
 
 	def load_listeners():
 		logger.info("loading listeners from disk at {}".format(data_store))
