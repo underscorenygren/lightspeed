@@ -21,6 +21,7 @@ from shared import ADMIN_PORT, \
 
 
 logger = logging.getLogger()
+listeners = None
 
 
 def now():
@@ -37,13 +38,18 @@ def filter_push_data(data):
 
 class Listener(object):
 
-	def __init__(self, name, config={}):
+	def __init__(self, name=None, config={},
+			updated_at=None, last_push={}, last_pushes={},
+			notify={}):
 
-		self.updated_at = now()
+		if not name:
+			raise ValueError("Listener must have name")
+
+		self.updated_at = updated_at or now()
 		self.name = name
-		self.last_push = {}
-		self.last_pushes = {}
-		self.notify = {}
+		self.last_push = last_push
+		self.last_pushes = last_pushes
+		self.notify = notify
 		self.config = config
 
 	def as_dict(self):
@@ -108,9 +114,6 @@ class Listeners(object):
 		return to_return
 
 
-listeners = Listeners()
-
-
 class BaseHandler(tornado.web.RequestHandler):
 
 	def _write(self, obj):
@@ -155,7 +158,12 @@ class ListenersHandler(BaseHandler):
 		if not name:
 			return self.error("no name supplied")
 
-		listener = listeners.add(name, Listener(name, config=data.get('config')))
+		listener = listeners.get(name)
+		if listener:
+			listener.config = data.get('config')
+		else:
+			listener = listeners.add(name, Listener(name=name, config=data.get('config')))
+
 		logger.debug('added listener {}'.format(name))
 
 		self._write(listener.as_dict())
@@ -244,6 +252,8 @@ class MatchHandler(tornado.web.RequestHandler):
 
 if __name__ == "__main__":
 
+	# NB: Global
+	listeners = Listeners()
 	app = tornado.web.Application(
 			[
 				(r'/listeners/(?P<name>[-_\w\d]+)/?', ListenerHandler),
@@ -254,19 +264,42 @@ if __name__ == "__main__":
 			],
 			debug=True
 		)
+	data_store = '/tmp/ls-admin.json'
+
+	def store_listeners():
+		logger.info("catching signal, storing listeners on disk at {}".format(data_store))
+		with open(data_store, 'w') as f:
+			f.write(json.dumps([listener_dict for listener_dict in listeners.get_all().values()], indent=2))
+
+	def load_listeners():
+		logger.info("loading listeners from disk at {}".format(data_store))
+		try:
+			with open(data_store, 'r') as f:
+				for listener_dict in json.loads(f.read()):
+					logger.info("loading {} from disk".format(listener_dict))
+					try:
+						listeners.add(Listener(**listener_dict))
+					except ValueError:
+						logger.error("listener is malformed")
+
+		except (IOError, ValueError):
+			logger.info("couldn't load data store")
 
 	tornado.options.parse_command_line()
 	logger = configure_logger('tornado.application')
 	logger.debug("starting")
 	admin_port = env("ADMIN_PORT", ADMIN_PORT)
+	load_listeners()
 	app.listen(admin_port, address='0.0.0.0')
 
 	def on_reload(*args, **kwargs):
 		listeners.notify_all("shutdown")
 
 	def sig_handler(sig, frame):
+		store_listeners()
 		listeners.notify_all("shutdown")
 
 	signal.signal(signal.SIGTERM, sig_handler)
+	signal.signal(signal.SIGINT, sig_handler)
 	tornado.autoreload.add_reload_hook(on_reload)
 	tornado.ioloop.IOLoop.instance().start()
