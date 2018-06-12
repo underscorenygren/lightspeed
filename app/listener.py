@@ -85,10 +85,10 @@ def consume(args):
 		if hook:
 			hook_error = None
 			try:
-				discord_user = _config.get("discord_notify", '')
-				discord_msg = "{} {}".format(discord_user, msg)\
-						.replace(name, '`{}`'.format(name))\
-						.replace('FAILED', '**FAILED**')
+				discord_user = _config.get("discord_notify", u'')
+				discord_msg = u"{} {}".format(discord_user, msg)\
+						.replace(name, u'`{}`'.format(name))\
+						.replace(u'FAILED', u'**FAILED**')
 
 				resp = requests.post(hook, json={"content": discord_msg})
 				if resp.status_code != 200:
@@ -110,7 +110,7 @@ def consume(args):
 		discord_notify(_config, "{pusher} {msg} {name} on {branch}".format(**dict(notify_data, name=name)))
 		worked, output = run(_exec, _dir, env={'branch': updated_branch}, logger=logger)
 
-		msg = "CI job {} {} on branch({})".format(name, "succeeded" if worked else "FAILED", updated_branch)
+		msg = u"CI job {} {} on branch({})".format(name, "succeeded" if worked else "FAILED", updated_branch)
 		notify_data['msg'] = msg
 		if not worked:
 			notify_data['output'] = output.split('\n')
@@ -124,7 +124,7 @@ def consume(args):
 
 		discord_msg = msg
 		if not worked:
-			discord_msg += "\n```{}```".format(output[-1800:]) if output else "`[no output]`"
+			discord_msg += u"\n```{}```".format(output[-1800:]) if output else "`[no output]`"
 		discord_notify(_config, discord_msg)
 
 	def handle_push(_config, parsed, updated_branch):
