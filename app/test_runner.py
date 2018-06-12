@@ -28,7 +28,7 @@ def run_one(to_exec, cwd, env={}, logger=None):
 	except Exception as e:
 		output = "uncaught exception on {}: {}".format(to_exec, str(e))
 
-	return worked, unicode(output)
+	return worked, output.decode('utf-8', errors='ignore')
 
 
 def run(one_or_many, cwd, env={}, logger=None):
