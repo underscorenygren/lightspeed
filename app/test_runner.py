@@ -34,13 +34,13 @@ def run_one(to_exec, cwd, env={}, logger=None):
 def run(one_or_many, cwd, env={}, logger=None):
 
 	if isinstance(one_or_many, list):
-		all_output = ""
+		all_output = u""
 		for to_exec in one_or_many:
 			_worked, _output = run_one(to_exec, cwd, env=env, logger=logger)
 			if not _worked:
 				return _worked, _output
 			else:
-				all_output += "\n{}".format(_output)
+				all_output += u"\n{}".format(_output)
 		return True, all_output
 	else:
 		return run_one(one_or_many, cwd, env=env, logger=logger)
