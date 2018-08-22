@@ -32,7 +32,7 @@ def is_updated_since(d1, seconds_old):
 	return now() - d1 < datetime.timedelta(seconds=seconds_old)
 
 def filter_push_data(data):
-	KEYS = ['pusher', 'branch', 'latest_hash', 'all_modified']
+	KEYS = ['pusher', 'branch', 'latest_hash', 'all_modified', 'status_url']
 	return {key: value for (key, value) in data.items() if key in KEYS}
 
 

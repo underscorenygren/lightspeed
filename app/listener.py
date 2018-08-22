@@ -101,7 +101,23 @@ def consume(args):
 			else:
 				logger.debug("hook ok")
 
+	def github_status(parsed, state, token):
+		if token:
+			try:
+				resp = requests.post(parsed['status_url'], json={
+					"state": state,
+					"context": 'ci'},
+					headers={
+					"Authorization": "token {}".format(token)}
+				)
+				logger.info("{}: {}".format(resp.status_code, resp.text))
+			except requests.exceptions.RequestException:
+				logger.exception("couldn't post to github status")
+
 	def run_hook(_config, parsed, updated_branch):
+
+		github_status(parsed, 'pending', _config.get('github_status_token'))
+
 		notify_data = {"msg": "running hook",
 			"branch": updated_branch}
 		for attr in ['pusher', 'latest_hash']:
@@ -112,20 +128,24 @@ def consume(args):
 
 		msg = u"CI job {} {} on branch({})".format(name, "succeeded" if worked else "FAILED", updated_branch)
 		notify_data['msg'] = msg
+		discord_msg = msg
+		logger.info(msg)
+
+		_status = 'success'
+
 		if not worked:
 			notify_data['output'] = output.split('\n')
-		notify(notify_data)
+			discord_msg += u"\n```{}```".format(output[-1800:]) if output else "`[no output]`"
+			_status = 'failure'
 
-		logger.info(msg)
+		github_status(parsed, _status, _config.get('github_status_token'))
+		notify(notify_data)
+		discord_notify(_config, discord_msg)
+
 		if output:
 			logger.info(output)
-		if not worked:
+		else:
 			logger.info("[no output]")
-
-		discord_msg = msg
-		if not worked:
-			discord_msg += u"\n```{}```".format(output[-1800:]) if output else "`[no output]`"
-		discord_notify(_config, discord_msg)
 
 	def handle_push(_config, parsed, updated_branch):
 		branch_filter = _config.get('branch_filter')

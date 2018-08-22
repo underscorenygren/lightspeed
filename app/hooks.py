@@ -22,7 +22,13 @@ class ReceiveHook(tornado.web.RequestHandler):
 		pusher = data.get("pusher", {}).get("name", "unknown")
 		branch = data.get("ref", "missing").split('/')[-1]
 		latest_hash = data.get("after")
-		repo_name = data.get("repository", {}).get("full_name")
+		repo = data.get("repository", {})
+		repo_name = repo.get("full_name")
+		statuses_url = repo.get('statuses_url')
+		status_url = None
+		if statuses_url and statuses_url.find("{sha}") != -1:
+			status_url = statuses_url.format(sha=latest_hash)
+
 		all_modified = set()
 		for commit in data.get("commits", []):
 			for modified in commit.get("modified", []):
@@ -42,6 +48,8 @@ class ReceiveHook(tornado.web.RequestHandler):
 				"branch": branch,
 				"latest_hash": latest_hash,
 				"all_modified": [m for m in all_modified]}
+		if status_url:
+			data["status_url"] = status_url
 
 		admin_url = "http://{}:{}/match/".format(
 				env("ADMIN_DOMAIN", "127.0.0.1"),
