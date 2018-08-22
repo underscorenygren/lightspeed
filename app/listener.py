@@ -123,10 +123,10 @@ def consume(args):
 		for attr in ['pusher', 'latest_hash']:
 			notify_data[attr] = parsed.get(attr)
 		notify(notify_data)
-		discord_notify(_config, "{pusher} {msg} {name} on {branch}".format(**dict(notify_data, name=name)))
+		discord_notify(_config, "{pusher} {msg} {name} on {branch}({latest_hash})".format(**dict(notify_data, name=name)))
 		worked, output = run(_exec, _dir, env={'branch': updated_branch}, logger=logger)
 
-		msg = u"CI job {} {} on branch({})".format(name, "succeeded" if worked else "FAILED", updated_branch)
+		msg = u"CI job {} {} on {}({})".format(name, "succeeded" if worked else "FAILED", updated_branch, parsed.get('latest_hash'))
 		notify_data['msg'] = msg
 		discord_msg = msg
 		logger.info(msg)
